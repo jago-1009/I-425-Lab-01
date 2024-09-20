@@ -1,4 +1,5 @@
 <?php
+
 require __DIR__ . '/DB.php'; //Require DB Class
 require __DIR__ . '/Router.php'; //Require Router class
 require __DIR__ . '/../routes.php'; //Require routes to indicate which file to server

@@ -31,6 +31,9 @@ function getAllPosts($db) {
             $posts[] = $post;
         }
     }
+    else {
+        throw new Exception("No posts found", 404);
+    }
     return $posts;
 }
 
@@ -68,12 +71,13 @@ function AddPost ($input, $db) {
     return $db->insert_id;
 }
 
-
-if (preg_match("/posts\/([0-9])+/", $url, $matches) && $_SERVER["REQUEST_METHOD"] == "GET")  {
+//NOTE: Uses exact URL, so that way the post doesn't load whenever comments are ran
+if (preg_match("/^\/posts\/([0-9]+)$/", $url, $matches) && $_SERVER["REQUEST_METHOD"] == "GET")  {
     $postId = $matches[1];
     $post = getPost($dbConn, $postId);
 
     echo json_encode($post);
+    return;
 }
 
 
@@ -89,9 +93,11 @@ if (preg_match("/posts\/([0-9])+/", $url, $matches) && $_SERVER["REQUEST_METHOD"
 function getPost($db, $id) {
     $statement = "SELECT * FROM posts WHERE id = '$id'";
     $result = $db->query($statement);
-    $result_row = $result->fetch_assoc();
-
-    return $result_row;
+    if ($result && $result->num_rows > 0) {
+        return $result->fetch_assoc();
+    } else {
+        throw new Exception("Comment not found", 404);
+    }
 }
 
 //update a post
