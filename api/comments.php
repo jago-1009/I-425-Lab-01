@@ -60,11 +60,26 @@ if (preg_match("/posts\/([0-9]+)\/comments/", $url, $matches) && $_SERVER["REQUE
 //postComments function; Grabs inputs from $_POST superglobal variable and creates SQL query inserting comments into table
 function postComments($input, $db, $postId)
 {
-    $userId = $input["user_id"];
-    $comment = $input["comment"];
+    $userId = $input["user_id"] ?? null;
+    $comment = $input["comment"] ?? null;
+    if (is_null($userId) || is_null($comment)) {
+        throw new Exception("Error Processing Request: Not enough Parameters", 500);
+        die;
+    }
+    else {
     $statement = "INSERT INTO comments (user_id,comment,post_id) VALUES ('$userId', '$comment', '$postId')";
     $db->query($statement);
-    return $db->insert_id;
+    $commentId = $db->insert_id;
+
+
+
+    return array([
+        "status"=>"success",
+        "comment_id"=>$commentId,
+        "user_id"=>$userId,
+        "endpoint"=>"/comments/$commentId"
+    ]);
+    }
 }
 
 

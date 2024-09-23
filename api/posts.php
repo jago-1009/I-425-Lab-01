@@ -2,8 +2,8 @@
 $url = $_SERVER["REQUEST_URI"];
 
 //checking if slash is first character in route otherwise add it
-if(strpos($url,"/") !== 0) {
-    $url = "/".$url;
+if (strpos($url, "/") !== 0) {
+    $url = "/" . $url;
 }
 
 //connect to database
@@ -17,7 +17,8 @@ if ($url == "/posts" && $_SERVER["REQUEST_METHOD"] == "GET") {
     $posts = getAllPosts($dbConn);
     echo json_encode($posts);
 }
-function getAllPosts($db) {
+function getAllPosts($db)
+{
     $statement = "SELECT * FROM posts";
     $result = $db->query($statement);
     if ($result && $result->num_rows > 0) {
@@ -30,8 +31,7 @@ function getAllPosts($db) {
                 'user_id' => $result_row['user_id']);
             $posts[] = $post;
         }
-    }
-    else {
+    } else {
         throw new Exception("No posts found", 404);
     }
     return $posts;
@@ -39,40 +39,53 @@ function getAllPosts($db) {
 
 
 //create a new post
- if ($url == "/posts" && $_SERVER["REQUEST_METHOD"] == "POST") {
-     $input = $_POST;
+if ($url == "/posts" && $_SERVER["REQUEST_METHOD"] == "POST") {
+    $input = $_POST;
 
-     $postId = addPost($input, $dbConn);
-     if ($postId) {
-         $input['id'] = $postId;
-         $input['link'] = "/posts/".$postId;
-     }
-     echo json_encode($input);
- }
+    $postId = addPost($input, $dbConn);
 
-/**
- * Add post
- *
- * @param $input
- * @param $db
- * @return integer
- */
+    echo json_encode($postId);
+    return;
 
-function AddPost ($input, $db) {
-    $title = $input["title"];
-    $status = $input["status"];
-    $content = $input["content"];
-    $users_id = $input["user_id"];
+}
 
-    $statement = "INSERT INTO posts (title, status, content, user_id) VALUES ('$title', '$status', '$content', '$users_id')";
 
-    $db->query($statement);
+function addPost($input, $db)
+{
+    $title = $input["title"] ?? null;
+    $status = $input["status"] ?? null;
+    $content = $input["content"] ?? null;
+    $user_id = $input["user_id"] ?? null;
+    if (is_null($title) || is_null($status) || is_null($content) || is_null($user_id)) {
+        throw new Exception("Error Processing Request: Not enough Parameters", 500);
+        die;
+    }
+    if ($status != "draft" && $status != "published") {
+        throw new Exception("Error processing Request: status field must be either 'draft' or 'published'", 500);
+        die;
+    } else {
+        $statement = ("INSERT INTO posts (title, status, content, user_id) VALUES ('$title', '$status', '$content', '$user_id')");
 
-    return $db->insert_id;
+        $db->query($statement);
+
+        $postId = $db->insert_id;
+
+        return array([
+            "http_status" => "success",
+            "id" => $postId,
+            "title" => $title,
+            "status" => $status,
+            "content" => $content,
+            "user_id" => $user_id,
+            "URI" => "/posts/$postId"]);
+
+    }
+
+
 }
 
 //NOTE: Uses exact URL, so that way the post doesn't load whenever comments are ran
-if (preg_match("/^\/posts\/([0-9]+)$/", $url, $matches) && $_SERVER["REQUEST_METHOD"] == "GET")  {
+if (preg_match("/^\/posts\/([0-9]+)$/", $url, $matches) && $_SERVER["REQUEST_METHOD"] == "GET") {
     $postId = $matches[1];
     $post = getPost($dbConn, $postId);
 
@@ -87,10 +100,11 @@ if (preg_match("/^\/posts\/([0-9]+)$/", $url, $matches) && $_SERVER["REQUEST_MET
  * @param $db
  * @param $id
  *
- * @return Associative Array
+ * @return array
  */
 
-function getPost($db, $id) {
+function getPost($db, $id)
+{
     $statement = "SELECT * FROM posts WHERE id = '$id'";
     $result = $db->query($statement);
     if ($result && $result->num_rows > 0) {
@@ -102,15 +116,11 @@ function getPost($db, $id) {
 
 //update a post
 
-if(preg_match("/posts\/([0-9])+/", $url, $matches) && $_SERVER['REQUEST_METHOD']
-    == 'PATCH'){
+if (preg_match("/posts\/(1000|[1-9][0-9]{0,2})/", $url, $matches) && $_SERVER['REQUEST_METHOD']
+    == 'PATCH') {
     $input = $_GET;
     $postId = $matches[1];
-    echo $url;
-    print_r($matches);
-    updatePost($input, $dbConn, $postId);
-    $post = getPost($dbConn, $postId);
-    echo json_encode($post);
+    echo updatePost($input, $dbConn, $postId);
 }
 
 
@@ -130,38 +140,44 @@ if(preg_match("/posts\/([0-9])+/", $url, $matches) && $_SERVER['REQUEST_METHOD']
  * @return string
  */
 
-function getParams($input) {
+function getParams($input)
+{
     $allowedFields = ['title', 'status', 'content', 'user_id'];
     $filterParams = [];
-    foreach($input as $param => $value){
-        if(in_array($param, $allowedFields)){
+    foreach ($input as $param => $value) {
+        if (in_array($param, $allowedFields)) {
             $filterParams[] = "$param='$value'";
         }
     }
     return implode(", ", $filterParams);
 }
-function updatePost($input, $db, $postId) {
+
+function updatePost($input, $db, $postId)
+{
     $fields = getParams($input);
 
-    $statement = "UPDATE posts SET $fields WHERE id = " . $postId;
-    echo $statement;
-    $db->query($statement);
-    return $postId;
+        $statement = "UPDATE posts SET $fields WHERE id = " . $postId;
+        $db->query($statement);
+        return json_encode(array([
+            "http_status" => "success",
+            "id" => $postId,
+            "endpoint" => "/posts/$postId"
+            ]));
 
 }
 
 //delete a post
 
-if(preg_match('/posts\/([0-9])+/', $url, $matches) && $_SERVER["REQUEST_METHOD"] == "DELETE")  {
+if (preg_match('/posts\/(1000|[1-9][0-9]{0,2})/', $url, $matches) && $_SERVER["REQUEST_METHOD"] == "DELETE") {
     $postId = $matches[1];
-
-    deletePost($dbConn, $postId);
-
-    echo json_encode([
-        'id' => $postId,
-        'deleted'=>'true'
-    ]);
-
+    try {
+        $post = getPost($dbConn, $postId);
+        if (count($post) > 3) {
+            echo deletePost($dbConn, $postId);
+        }
+    } catch (Exception $e) {
+        throw new Exception("Error: Post not found", 404);
+    }
 }
 
 
@@ -172,7 +188,15 @@ if(preg_match('/posts\/([0-9])+/', $url, $matches) && $_SERVER["REQUEST_METHOD"]
  * @param $id
  *
  */
-function deletePost ($db, $id) {
+function deletePost($db, $id)
+{
     $statement = "DELETE FROM posts WHERE id = " . $id;
     $db->query($statement);
+
+
+    return json_encode([
+        'id' => $id,
+        'deleted' => 'true'
+    ]);
+
 }
