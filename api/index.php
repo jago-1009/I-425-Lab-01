@@ -38,7 +38,8 @@ function handle_statement($statement) {
 
 }
 set_exception_handler('exception_handler');
-if (str_contains($url, "posts") == false && str_contains($url, "comments") == false || $url == "") {
+
+if (!str_contains($url, "posts") && !str_contains($url, "comments") || $url == "") {
     throw new Exception("Endpoint not found", 404);
 }
 require __DIR__.'/../core/bootstrap.php';
