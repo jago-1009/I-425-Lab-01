@@ -144,4 +144,109 @@ function getComment($db, $id) {
 if (preg_match("/comments\/([0-9]+)/", $url, $matches) && $_SERVER["REQUEST_METHOD"] == "POST") {
     throw new Exception("Invalid Method", 405);
 }
+
+// Update a specific comment
+if (preg_match("/comments\/([0-9]+)/", $url, $matches) && $_SERVER["REQUEST_METHOD"] == "PATCH") {
+    $input = $_GET;
+    $commentId = $matches[1];
+
+    try {
+        updateComment($input, $dbConn, $commentId);
+        $comment = getComment($dbConn, $commentId);
+
+        if ($comment) {
+            echo json_encode($comment);
+        } else {
+            throw new Exception("Comment not found", 404);
+        }
+    } catch (Exception $e) {
+        http_response_code($e->getCode());
+        echo json_encode(["error" => $e->getMessage()]);
+    }
+}
+
+/**
+ * Update Comment
+ *
+ * @param $input
+ * @param $db
+ * @param $commentId
+ * @return integer
+ */
+function updateComment($input, $db, $commentId) {
+    $fields = getCommentParams($input);
+
+    if (empty($fields)) {
+        throw new Exception("No fields to update", 400);
+    }
+
+    $statement = "UPDATE comments SET $fields WHERE id = " . $commentId;
+
+    try {
+        $result = $db->query($statement);
+
+        if ($db->affected_rows > 0) {
+            return $commentId;
+        } else {
+            throw new Exception("Comment not found or no fields updated", 404);
+        }
+    } catch (Exception $e) {
+        throw new Exception("Error updating comment: " . $e->getMessage(), 500);
+    }
+}
+
+/**
+ * Get fields as parameters to set in record
+ *
+ * @param $input
+ * @return string
+ */
+function getCommentParams($input) {
+    $allowedFields = ['comment', 'user_id']; // Allow only these fields to be updated
+    $filterParams = [];
+
+    foreach ($input as $param => $value) {
+        if (in_array($param, $allowedFields)) {
+            $filterParams[] = "$param='$value'";
+        }
+    }
+
+    return implode(", ", $filterParams);
+}
+
+
+// Delete a specific comment
+if (preg_match("/comments\/([0-9]+)/", $url, $matches) && $_SERVER["REQUEST_METHOD"] == "DELETE") {
+    $commentId = $matches[1];
+    try {
+        echo deleteComment($dbConn, $commentId);
+    } catch (Exception $e) {
+        echo json_encode(["error" => $e->getMessage(), "code" => $e->getCode()]);
+    }
+}
+
+// Delete comment function
+function deleteComment($db, $commentId)
+{
+    $statement = "DELETE FROM comments WHERE id = '$commentId'";
+
+    try {
+        $result = $db->query($statement);
+        if ($db->affected_rows > 0) {
+            return json_encode([
+                "status" => "success",
+                "comment_id" => $commentId,
+                "deleted" => true
+            ]);
+        } else {
+            throw new Exception("Comment not found", 404);
+        }
+    } catch (Exception $e) {
+        throw new Exception("Error deleting comment: " . $e->getMessage(), 500);
+    }
+}
+
+
 ?>
+
+

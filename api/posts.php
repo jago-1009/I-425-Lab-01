@@ -115,56 +115,75 @@ function getPost($db, $id)
 }
 
 //update a post
-
-if (preg_match("/posts\/(1000|[1-9][0-9]{0,2})/", $url, $matches) && $_SERVER['REQUEST_METHOD']
-    == 'PATCH') {
+//Update a post with error handling
+if (preg_match("/posts\/([0-9]+)/", $url, $matches) && $_SERVER['REQUEST_METHOD'] == 'PATCH') {
     $input = $_GET;
     $postId = $matches[1];
-    echo updatePost($input, $dbConn, $postId);
+
+    try {
+        updatePost($input, $dbConn, $postId);
+        $post = getPost($dbConn, $postId);
+
+        if ($post) {
+            echo json_encode($post);
+        } else {
+            throw new Exception("Post not found", 404);
+        }
+    } catch (Exception $e) {
+        echo json_encode(["error" => $e->getMessage()]);
+    }
 }
 
-
 /**
- * Update Post
+ * Update Post with error handling
  *
  * @param $input
  * @param $db
  * @param $postId
- * @return Integer
+ * @return integer
  */
+function updatePost($input, $db, $postId) {
+    $fields = getParams($input);
+
+    if (empty($fields)) {
+        throw new Exception("No fields to update", 400);
+    }
+
+    $statement = "UPDATE posts SET $fields WHERE id = " . $postId;
+
+    // Error handling for the update
+    try {
+        $result = $db->query($statement);
+
+        if ($db->affected_rows > 0) {
+            return $postId;
+        } else {
+            throw new Exception("Post not found or no fields updated", 404);
+        }
+    } catch (Exception $e) {
+        throw new Exception("Error updating post: " . $e->getMessage(), 500);
+    }
+}
+
 /**
- *
- * Get Fields as parameters to set in record
+ * Get fields as parameters to set in record
  *
  * @param $input
  * @return string
  */
-
-function getParams($input)
-{
+function getParams($input) {
     $allowedFields = ['title', 'status', 'content', 'user_id'];
     $filterParams = [];
+
     foreach ($input as $param => $value) {
         if (in_array($param, $allowedFields)) {
             $filterParams[] = "$param='$value'";
         }
     }
+
     return implode(", ", $filterParams);
 }
 
-function updatePost($input, $db, $postId)
-{
-    $fields = getParams($input);
-
-        $statement = "UPDATE posts SET $fields WHERE id = " . $postId;
-        $db->query($statement);
-        return json_encode(array([
-            "http_status" => "success",
-            "id" => $postId,
-            "endpoint" => "/posts/$postId"
-            ]));
-
-}
 
 //delete a post
 
@@ -191,12 +210,19 @@ if (preg_match('/posts\/(1000|[1-9][0-9]{0,2})/', $url, $matches) && $_SERVER["R
 function deletePost($db, $id)
 {
     $statement = "DELETE FROM posts WHERE id = " . $id;
-    $db->query($statement);
 
-
-    return json_encode([
-        'id' => $id,
-        'deleted' => 'true'
-    ]);
-
+    // Error handling for the delete
+    try {
+        $result = $db->query($statement);
+        if ($db->affected_rows > 0) {
+            return json_encode([
+                'id' => $id,
+                'deleted' => 'true'
+            ]);
+        } else {
+            throw new Exception("Post not found", 404);
+        }
+    } catch (Exception $e) {
+        throw new Exception("Error deleting post: " . $e->getMessage(), 500);
+    }
 }
